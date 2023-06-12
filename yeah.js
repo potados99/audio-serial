@@ -4,7 +4,7 @@ Quiet.init({
     memoryInitializerPrefix: "./vendor/",
 });
 
-const profile = 'audible';
+const profile = 'audible-fsk-robust';
 
 let transmitter;
 
@@ -23,7 +23,7 @@ function onReceive(payload) {
 async function onQuietReady() {
     console.log(`Quiet is ready.`);
 
-    transmitter = Quiet.transmitter({profile: profile});
+    transmitter = Quiet.transmitter({profile: profile, clampFrame: false/*important*/});
 
     Quiet.receiver({
         profile: profile,
