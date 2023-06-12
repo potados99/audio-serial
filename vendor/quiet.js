@@ -62,7 +62,6 @@ var Quiet = (function() {
     function initAudioContext() {
         if (audioCtx === undefined) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            console.log(audioCtx.sampleRate);
         }
     };
 
@@ -100,7 +99,7 @@ var Quiet = (function() {
 
     function onEmscriptenLocateFile(path, prefix) {
         if (path.endsWith(".mem")) {
-            return memoryInitializerPrefixURL + path;
+            return memoryInitializerPrefix + path;
         }
 
         return prefix + path;
@@ -140,10 +139,16 @@ var Quiet = (function() {
     };
 
     function setMemoryInitializerPrefix(prefix) {
-        memoryInitializerPrefixURL = prefix;
+        if (!prefix.endsWith("/")) {
+            prefix += "/";
+        }
+        memoryInitializerPrefix = prefix;
     };
 
     function setLibfecPrefix(prefix) {
+        if (!prefix.endsWith("/")) {
+            prefix += "/";
+        }
         Module.dynamicLibraries = Module.dynamicLibraries || [];
         Module.dynamicLibraries.push(prefix + "libfec.js");
     };
@@ -305,12 +310,10 @@ var Quiet = (function() {
         var done = opts.onFinish;
 
         var opt = Module.ccall('quiet_encoder_profile_str', 'pointer', ['array', 'array'], [c_profiles, c_profile]);
-        console.log(opt);
 
         // libquiet internally works at 44.1kHz but the local sound card
         // may be a different rate. we inform quiet about that here
         var encoder = Module.ccall('quiet_encoder_create', 'pointer', ['pointer', 'number'], [opt, audioCtx.sampleRate]);
-        console.log(encoder);
 
         Module.ccall('free', null, ['pointer'], [opt]);
 
@@ -418,7 +421,6 @@ var Quiet = (function() {
         // first we push as much payload as will fit into encoder's tx queue
         // then we create the next sample block (if played = true)
         var writebuf = function() {
-            console.log('writebuf');
             if (destroyed) {
                 return;
             }
@@ -509,7 +511,6 @@ var Quiet = (function() {
         };
 
         var transmit = function(buf) {
-            console.log('transmit');
             if (destroyed) {
                 return;
             }
@@ -628,10 +629,24 @@ var Quiet = (function() {
         };
     };
 
+    function createAudioInput(stream) {
+        console.log('audio input is about to be created.');
 
-    function createAudioInput() {
         audioInput = 0; // prevent others from trying to create
+
         window.setTimeout(function() {
+            if (stream != null) {
+                console.log('using a given stream.');
+
+                audioInput = audioCtx.createMediaStreamSource(stream);
+
+                window.quiet_receiver_anti_gc = audioInput;
+
+                audioInputReady();
+
+                return;
+            }
+
             gUM.call(navigator, gUMConstraints(),
                 function(e) {
                     audioInput = audioCtx.createMediaStreamSource(e);
@@ -712,6 +727,7 @@ var Quiet = (function() {
      * @function receiver
      * @memberof Quiet
      * @param {object} opts - receiver params
+     * @param {MediaStream} opts.stream - stream where input audio will be.
      * @param {string|object} opts.profile - name of profile to use, must be a key in quiet-profiles.json OR an object which contains a complete profile
      * @param {onReceive} opts.onReceive - callback which receiver will call to send user received data
      * @param {function} [opts.onCreate] - callback to notify user that receiver has been created and is ready to receive. if the user needs to grant permission to use the microphone, this callback fires after that permission is granted.
@@ -751,7 +767,7 @@ var Quiet = (function() {
         }
 
         if (audioInput === undefined) {
-            createAudioInput()
+            createAudioInput(opts.stream);
         }
 
         // TODO investigate if this still needs to be placed on window.

@@ -4,7 +4,7 @@ Quiet.init({
     memoryInitializerPrefix: "./vendor/",
 });
 
-const profile = 'audible-fsk-robust';
+const profile = 'audible-fsk';
 
 let transmitter;
 
